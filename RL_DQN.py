@@ -42,16 +42,28 @@ class Net(nn.Module):
         # [b,n_states]-->[b,n_hidden]
         self.fc1 = nn.Linear(n_states, n_hidden)
 
-        self.fc2 = nn.Linear(n_hidden, n_hidden)
+        self.fh1 = nn.Linear(n_hidden, n_hidden)
+        self.fh2 = nn.Linear(n_hidden, n_hidden)
+        self.fh3 = nn.Linear(n_hidden, n_hidden)
+        self.fh4 = nn.Linear(n_hidden, n_hidden)
+        self.fh5 = nn.Linear(n_hidden, n_hidden)
+
         # [b,n_hidden]-->[b,n_actions]
-        self.fc3 = nn.Linear(n_hidden, n_actions)
+        self.fc2 = nn.Linear(n_hidden, n_actions)
 
     # 前传
     # 激活函数为ReLU
     def forward(self, x):  # [b,n_states]
         x = torch.relu(self.fc1(x))
+
+        x = torch.relu(self.fh1(x))
+        x = torch.relu(self.fh2(x))
+        x = torch.relu(self.fh3(x))
+        x = torch.relu(self.fh4(x))
+        x = torch.relu(self.fh5(x))
+
         x = torch.relu(self.fc2(x))
-        x = torch.relu(self.fc3(x))
+
         return x
 
 

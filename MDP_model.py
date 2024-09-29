@@ -65,7 +65,7 @@ class MDP:
 
         #状态不改变
         if state == next_state:
-            r += 0
+            r += -10
 
         #满电量
         if next_state[2] == self.E_max:

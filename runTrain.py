@@ -13,19 +13,19 @@ device = torch.device("cuda"if torch.cuda.is_available() else "cpu")
 # 全局变量
 # ------------------------------- #
 
-capacity = 200  # 经验池容量
+capacity = 500  # 经验池容量
 lr = 1e-3  # 学习率
 gamma = 0.98  # 折扣因子
-epsilon = 0.8  # 贪心系数
+epsilon = 0.5  # 贪心系数
 epsilon_min = 0.1 #最小贪心系数
 epsilon_decay = 0.98 #贪心系数折扣率
-target_update = 5  # 目标网络的参数的更新频率
-batch_size = 5
-n_hidden = 128  # 隐含层神经元个数
-min_size = 10  # 经验池超过多少后再训练
+target_update = 50  # 目标网络的参数的更新频率
+batch_size = 32
+n_hidden = 64  # 隐含层神经元个数
+min_size = 200  # 经验池超过多少后再训练
 return_list = []  # 记录每个回合的回报
 loss = []
-Is_train=True  #是否有训练模型
+Is_train = False  #是否有训练模型
 episode = 1000
 
 
@@ -47,14 +47,14 @@ agent = DQN(n_states=n_states,
             device=device,
             Is_train=Is_train
             )
-for Id in range(50):
-    env.make(Id)
+for i in range(episode):
     loss = []
     return_list = []  # 记录每个回合的回报
-    with tqdm(total=episode) as pbar:
+    with tqdm(total=50) as pbar:
         # 训练模型
-        for i in range(episode):  # 100回合
+        for Id in range(50):
             # 每个回合开始前重置环境
+            env.make(Id)
             state = env.reset()  # len=4
             # 记录每个回合的回报
             episode_return = 0
@@ -93,7 +93,7 @@ for Id in range(50):
             return_list.append(episode_return)
 
             # 更新进度条信息
-            pbar.set_description(desc= "Iteration %d" %Id)
+            pbar.set_description(desc= "Iteration %d" %i)
             pbar.set_postfix({
                 'return': '%.3f' % np.mean(return_list),
                 "loss": '%f' % np.mean(loss) if len(loss) > 0 else 0
