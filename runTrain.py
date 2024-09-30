@@ -1,11 +1,11 @@
-import gym
-from sympy import false
 from Environment import Environment
 from RL_DQN import DQN, ReplayBuffer
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+
 # GPU运算
 device = torch.device("cuda"if torch.cuda.is_available() else "cpu")
 
@@ -16,7 +16,7 @@ device = torch.device("cuda"if torch.cuda.is_available() else "cpu")
 capacity = 500  # 经验池容量
 lr = 1e-3  # 学习率
 gamma = 0.98  # 折扣因子
-epsilon = 0.5  # 贪心系数
+epsilon = 0.9  # 贪心系数
 epsilon_min = 0.1 #最小贪心系数
 epsilon_decay = 0.98 #贪心系数折扣率
 target_update = 50  # 目标网络的参数的更新频率
@@ -25,14 +25,15 @@ n_hidden = 64  # 隐含层神经元个数
 min_size = 200  # 经验池超过多少后再训练
 return_list = []  # 记录每个回合的回报
 loss = []
-Is_train = False  #是否有训练模型
+loss_list = [] #用来保留每回合平均loss
+Is_train = True  #是否有训练模型
 episode = 1000
 
 
 # 加载环境
 env = Environment()
 n_states = 4  # 4
-n_actions = 50  # 2
+n_actions = 50
 
 # 实例化经验池
 replay_buffer = ReplayBuffer(capacity)
@@ -58,14 +59,17 @@ for i in range(episode):
             state = env.reset()  # len=4
             # 记录每个回合的回报
             episode_return = 0
+            # 记录经过的点
+            action_list = [state[0]]
 
             done = False
 
             while True:
                 # 获取当前状态下需要采取的动作
                 action = agent.take_action(state)
+                action_list.append(action)
                 # 更新环境
-                next_state, reward, done = env.step(action)
+                next_state, reward, done = env.step(action,action_list)
                 # 添加经验池
                 replay_buffer.add(state, action, reward, next_state, done)
                 # 更新当前状态
@@ -100,9 +104,11 @@ for i in range(episode):
             })
             pbar.update(1)
 
-            #贪心系数衰减
-            if epsilon > epsilon_min:
-                epsilon *= epsilon_decay
+    loss_list.append(np.mean(loss))
+
+    #贪心系数衰减
+    if epsilon > epsilon_min:
+        epsilon *= epsilon_decay
 
 #保存模型
 agent.model_save()

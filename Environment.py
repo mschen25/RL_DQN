@@ -23,11 +23,14 @@ class Environment:
         self.ori_state=self.mdp.set_state_and_target(i)#更新ori_state
         self.end = self.mdp.get_end_point()
 
-    def step(self,action):
+        #返回电动车数据
+        return list(self.mdp.get_evs(i))
+
+    def step(self,action,action_list):
         # 更新当前状态和下一状态
         state, self.next_state=self.mdp.state_transfer(action)
         # 更新奖励
-        self.reward = self.mdp.get_reword(state,self.next_state)
+        self.reward = self.mdp.get_reword(state,self.next_state,action_list)
 
         # 更新运行状态done
         if self.next_state[1] < 0 or self.next_state[0] == self.end:

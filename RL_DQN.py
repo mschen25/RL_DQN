@@ -74,8 +74,8 @@ class Net(nn.Module):
 class DQN:
     # （1）初始化
     def __init__(self, n_states, n_hidden, n_actions,
-                 learning_rate, gamma, epsilon,
-                 target_update, device,Is_train):
+                 learning_rate=1e-3 , gamma=0, epsilon=0,
+                 target_update=0, device=None,Is_train=False):
         # 属性分配
         self.n_states = n_states  # 状态的特征数
         self.n_hidden = n_hidden  # 隐含层个数
