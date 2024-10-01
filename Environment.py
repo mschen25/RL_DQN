@@ -1,5 +1,6 @@
 from MDP_model import MDP
 import numpy as np
+
 class Environment:
     def __init__(self):
         # 初始状态
@@ -26,11 +27,11 @@ class Environment:
         #返回电动车数据
         return list(self.mdp.get_evs(i))
 
-    def step(self,action,action_list):
+    def step(self,action):
         # 更新当前状态和下一状态
         state, self.next_state=self.mdp.state_transfer(action)
         # 更新奖励
-        self.reward = self.mdp.get_reword(state,self.next_state,action_list)
+        self.reward = self.mdp.get_reword(state,self.next_state)
 
         # 更新运行状态done
         if self.next_state[1] < 0 or self.next_state[0] == self.end:

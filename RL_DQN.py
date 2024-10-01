@@ -50,7 +50,7 @@ class Net(nn.Module):
 
         # [b,n_hidden]-->[b,n_actions]
         self.fc2 = nn.Linear(n_hidden, n_actions)
-
+        self.leaky_relu = nn.LeakyReLU(negative_slope=0.001)
     # 前传
     # 激活函数为ReLU
     def forward(self, x):  # [b,n_states]
@@ -62,7 +62,7 @@ class Net(nn.Module):
         x = torch.relu(self.fh4(x))
         x = torch.relu(self.fh5(x))
 
-        x = torch.relu(self.fc2(x))
+        x = self.leaky_relu(self.fc2(x))
 
         return x
 
@@ -101,17 +101,24 @@ class DQN:
             self.target_q_net.load_state_dict(torch.load("net.pth",weights_only=True))
         # 优化器，更新训练网络的参数
         self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=self.learning_rate)
+
     # （2）动作选择
-    def take_action(self, state):
+    def take_action(self, state,action_list):
         # 维度扩充，给行增加一个维度，并转换为张量shape=[1,4]
         state = torch.Tensor(state[np.newaxis, :])
         # 如果小于该值就取最大的值对应的索引
         if np.random.random() > self.epsilon:  # 0-1
             # 前向传播获取该状态对应的动作的reward
             actions_value = self.q_net(state)
-            # 获取reward最大值对应的动作索引
-            action = actions_value.argmax().item()  # int
-        # 如果大于该值就随机探索
+            # 根据动作列表和Q值 选取未进行过的动作
+            while True:
+                # 获取reward最大值对应的动作索引
+                action = actions_value.argmax().item()  # int
+                if action not in action_list:
+                    break
+                else:
+                    actions_value.data[0,action] = -100
+        # 如果小于该值就随机探索
         else:
             # 随机选择一个动作
             action = np.random.randint(self.n_actions)
@@ -157,5 +164,6 @@ class DQN:
         self.count += 1
 
         return dqn_loss.item()
+    # (4)模型保存
     def model_save(self):
         torch.save(self.q_net.state_dict(),'net.pth')

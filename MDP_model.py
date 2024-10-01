@@ -49,11 +49,11 @@ class MDP:
         self.state = [self.start, self.time, self.E, self.end]
         return self.state
 
-    def get_reword(self, state, next_state,action_list ):
+    def get_reword(self, state, next_state):
         r = 0
         #到达终点
         if next_state[0] == self.end:
-            r += 30
+            r += 20
 
         #超时
         if next_state[1] < 0 :
@@ -63,9 +63,9 @@ class MDP:
         if next_state[0] != self.end and next_state[1] <= 0 :
             r += 0
 
-        #重复经过点
-        if next_state[0] in action_list:
-            r += -10
+        #状态不变
+        if state == next_state:
+            r += -1
 
         #满电量
         if next_state[2] == self.E_max:
@@ -91,6 +91,8 @@ class MDP:
         e = self.state[2] - self.cost*distance+a*self.MPT*diet_t
         E = min(e, self.E_max)
         t = self.state[1] - diet_t
+
+        #更新状态
         next_state = [action, t, E, self.end]
         state = self.state
         self.state = next_state
@@ -102,3 +104,6 @@ class MDP:
 
     def get_evs(self,i):
         return self.EVs[i,:5]
+
+    def get_len(self):
+        return len(self.EVs)
