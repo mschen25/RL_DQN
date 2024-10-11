@@ -23,7 +23,7 @@ min_size = 200  # 经验池超过多少后再训练
 episode = 1000
 
 n_hidden = 64  # 隐含层神经元个数
-n_states = 4  # 状态个数
+n_states = 5  # 状态个数
 n_actions = 50 #动作个数
 Is_train = True #是否有模型
 result_list = [] #汇总结果记录
@@ -66,22 +66,25 @@ with tqdm(total=num) as pbar:
             action_list.append(action)
             #更新状态
             next_state, reward, done =env.step(action)
+            #储存电量和时间
+            E_and_T_list.append([next_state[2], next_state[1]])
             if not done:
                 #储存路径
                 path.append( (int(state[0]), int(next_state[0])) )
-                #储存电量和时间
-                E_and_T_list.append([next_state[2], next_state[1]])
+
                 # 更新当前状态
                 state = next_state
             else:
                 path.append( (int(state[0]),int(state[3])))
                 break
-        df.append(EVs)
-        df.append(path)
-        df.append(E_and_T_list)
-        if len(E_and_T_list) == 0 :
-            E_and_T_list.append([env.reset()[2], env.reset()[1]])
-        result_list.append([i]+E_and_T_list[-1])
+
+        # 对到达终点的车进行记录
+        if E_and_T_list[-1][1] >= 0 :
+            df.append(EVs)
+            df.append(path)
+            df.append(E_and_T_list)
+
+            result_list.append([i]+E_and_T_list[-1])
 
         pbar.update(1)
 

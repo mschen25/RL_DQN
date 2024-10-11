@@ -13,29 +13,29 @@ device = torch.device("cuda"if torch.cuda.is_available() else "cpu")
 # ------------------------------- #
 # 全局变量
 # ------------------------------- #
-
-capacity = 1000  # 经验池容量
+important_capacity = 250 #重要经验池
+capacity = 750  # 经验池容量
 lr = 1e-3  # 学习率
 gamma = 0.9  # 折扣因子
-epsilon = 0.5 # 贪心系数 小于探索
-epsilon_min = 0.1 #最小贪心系数
+epsilon = 0.9 # 贪心系数 小于探索
+epsilon_min = 0.01 #最小贪心系数
 epsilon_decay = 0.98 #贪心系数折扣率
-target_update = 25  # 目标网络的参数的更新频率
-batch_size = 32  # 更新网络的数据量
+target_update = 50  # 目标网络的参数的更新频率
+batch_size = 64  # 更新网络的数据量
 n_hidden = 64  # 隐含层神经元个数
 min_size = 100  # 经验池超过多少后再训练
 return_list = []  # 记录每个回合的回报
 
 loss = [] # 记录每回合每次更新网络产生是loss
 loss_list = [] #用来保留每回合平均loss
-Is_train = True  #是否有训练模型
-episode = 1000
+Is_train = False  #是否有训练模型
+episode = 500
 
 
 # 加载环境
 
 env = Environment()
-n_states = 4  # 4
+n_states = 5  # 4
 n_actions = 50
 # 获取电动车个数
 mdp= MDP()
@@ -43,7 +43,7 @@ num = mdp.get_len()
 reward_return = np.array([[x] for x in range(num)]) #记录所有回报
 
 # 实例化经验池
-replay_buffer = ReplayBuffer(capacity)
+replay_buffer = ReplayBuffer(capacity,important_capacity)
 # 实例化DQN
 agent = DQN(n_states=n_states,
             n_hidden=n_hidden,
@@ -76,7 +76,10 @@ for i in range(episode):
                 # 更新环境
                 next_state, reward, done = env.step(action)
                 # 添加经验池
-                replay_buffer.add(state, action, reward, next_state, done)
+                if reward <= 10:
+                    replay_buffer.add(state, action, reward, next_state, done)
+                else:
+                    replay_buffer.add_important(state, action, reward, next_state, done)
                 # 更新当前状态
                 state = next_state
                 # 更新回合回报
@@ -114,6 +117,7 @@ for i in range(episode):
     #贪心系数衰减
     if epsilon > epsilon_min:
         epsilon *= epsilon_decay
+        agent.update_epsilon(epsilon)
 
 #保存模型
 agent.model_save()

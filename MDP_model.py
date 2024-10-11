@@ -6,15 +6,15 @@ import numpy as np
 class MDP:
     def __init__(self):
         #点的经纬度
-        self.data = np.array(pd.read_csv("数据集/data_50.csv", header=None))
+        self.data = np.array(pd.read_csv("./数据集/data_50.csv", header=None))
         #各点之间的距离
-        self.distance = np.array(pd.read_csv("数据集/distance_50.csv", header=None))
+        self.distance = np.array(pd.read_csv("./数据集/distance_50.csv", header=None))
         #该点是否能充电
-        self.charge_roads = np.array(pd.read_csv("数据集/roads_50.csv", header=None))
+        self.charge_roads = np.array(pd.read_csv("./数据集/roads_50.csv", header=None))
         #在该路径的速度
-        self.speed = np.array(pd.read_csv("数据集/speed_50.csv", header=None))
+        self.speed = np.array(pd.read_csv("./数据集/speed_50.csv", header=None))
         #4-7列分别为初始电量，满电量，剩余时间，行驶耗能
-        self.EVs_50 = np.array(pd.read_csv("数据集/EVs_50.csv", header=None))
+        self.EVs_50 = np.array(pd.read_csv("./数据集/EVs_50.csv", header=None))
         self.MPT = 100  # 充电功率
 
         #把EVs_50中的经纬度换成对应点
@@ -46,7 +46,7 @@ class MDP:
         self.cost = self.EVs[i][5]/100.0
         self.end = self.EVs[i][1]
         self.start = int(self.EVs[i][0])
-        self.state = [self.start, self.time, self.E, self.end]
+        self.state = [self.start, self.time, self.E, self.end, self.E_max]
         return self.state
 
     def get_reword(self, state, next_state):
@@ -55,17 +55,21 @@ class MDP:
         if next_state[0] == self.end:
             r += 20
 
+        # 到达终点且满电且不超时
+        if next_state[0] == self.end and next_state[2] == self.E_max and next_state[1] < 0:
+            r += 50
+
         #超时
         if next_state[1] < 0 :
-            r += 0
+            r += -10
 
         #超时未到终点
-        if next_state[0] != self.end and next_state[1] <= 0 :
-            r += 0
+        if next_state[0] != self.end and next_state[1] < 0 :
+            r += -30
 
         #状态不变
         if state == next_state:
-            r += -1
+            r += -10
 
         #满电量
         if next_state[2] == self.E_max:
@@ -88,12 +92,12 @@ class MDP:
         diet_t = distance/(speed + 1e-8)
 
         #电量变化
-        e = self.state[2] - self.cost*distance+a*self.MPT*diet_t
+        e = self.state[2] - self.cost*distance + a*self.MPT*diet_t
         E = min(e, self.E_max)
         t = self.state[1] - diet_t
 
         #更新状态
-        next_state = [action, t, E, self.end]
+        next_state = [action, t, E, self.end, self.E_max]
         state = self.state
         self.state = next_state
 

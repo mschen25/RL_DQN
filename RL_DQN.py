@@ -6,29 +6,43 @@ import collections
 import random
 
 
+
 # --------------------------------------- #
 # 经验回放池
 # --------------------------------------- #
 
 class ReplayBuffer:
-    def __init__(self, capacity):
+    def __init__(self, capacity, important_capacity):
         # 创建一个先进先出的队列，最大长度为capacity，保证经验池的样本量不变
         self.buffer = collections.deque(maxlen=capacity)
+        # 创建一个重要经验池
+        self.important_buffer = collections.deque(maxlen=important_capacity)
+        self.now_experience =None
+        self.important_scale = int(capacity / important_capacity)
 
     # 将数据以元组形式添加进经验池
     def add(self, state, action, reward, next_state, done):
         self.buffer.append((state, action, reward, next_state, done))
+        self.now_experience = (state, action, reward, next_state, done)
+
+    def add_important(self, state, action, reward, next_state, done):
+        self.important_buffer.append((state, action, reward, next_state, done))
+        self.now_experience = (state, action, reward, next_state, done)
 
     # 随机采样batch_size行数据
     def sample(self, batch_size):
-        transitions = random.sample(self.buffer, batch_size)  # list, len=32
+        important_size = min(int(batch_size / self.important_scale), len(self.important_buffer))
+        common_size = batch_size - important_size - 1
+        transitions = random.sample(self.important_buffer, important_size)
+        transitions.extend(random.sample(self.buffer, common_size))
+        transitions.append(self.now_experience)
         # *transitions代表取出列表中的值，即32项
         state, action, reward, next_state, done = zip(*transitions)
         return np.array(state), action, reward, np.array(next_state), done
 
     # 目前队列长度
     def size(self):
-        return len(self.buffer)
+        return len(self.buffer) + len(self.important_buffer)
 
 
 # -------------------------------------- #
@@ -50,7 +64,7 @@ class Net(nn.Module):
 
         # [b,n_hidden]-->[b,n_actions]
         self.fc2 = nn.Linear(n_hidden, n_actions)
-        self.leaky_relu = nn.LeakyReLU(negative_slope=0.001)
+        self.leaky_relu = nn.LeakyReLU(negative_slope=0.01)
     # 前传
     # 激活函数为ReLU
     def forward(self, x):  # [b,n_states]
@@ -62,7 +76,7 @@ class Net(nn.Module):
         x = torch.relu(self.fh4(x))
         x = torch.relu(self.fh5(x))
 
-        x = self.leaky_relu(self.fc2(x))
+        x = self.fc2(x)
 
         return x
 
@@ -90,7 +104,7 @@ class DQN:
         self.Is_train = Is_train
 
         # 构建2个神经网络，相同的结构，不同的参数
-        # 实例化训练网络  [b,4]-->[b,2]  输出动作对应的奖励
+        # 实例化训练网络  [b,4]-->[b,50]  输出动作对应的奖励
         self.q_net = Net(self.n_states, self.n_hidden, self.n_actions)
         # 实例化目标网络
         self.target_q_net = Net(self.n_states, self.n_hidden, self.n_actions)
@@ -167,3 +181,6 @@ class DQN:
     # (4)模型保存
     def model_save(self):
         torch.save(self.q_net.state_dict(),'net.pth')
+
+    def update_epsilon(self,epsilon):
+        self.epsilon = epsilon
