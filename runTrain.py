@@ -29,7 +29,7 @@ return_list = []  # 记录每个回合的回报
 loss = [] # 记录每回合每次更新网络产生是loss
 loss_list = [] #用来保留每回合平均loss
 Is_train = False  #是否有训练模型
-episode = 500
+episode = 200
 
 
 # 加载环境
