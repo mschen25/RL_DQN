@@ -79,7 +79,7 @@ with tqdm(total=num) as pbar:
                 break
 
         # 对到达终点的车进行记录
-        if E_and_T_list[-1][1] >= 0 :
+        if E_and_T_list[-1][1] >= 0 and E_and_T_list[-1][0] > 0 :
             df.append(EVs)
             df.append(path)
             df.append(E_and_T_list)

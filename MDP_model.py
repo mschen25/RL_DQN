@@ -6,15 +6,15 @@ import numpy as np
 class MDP:
     def __init__(self):
         #点的经纬度
-        self.data = np.array(pd.read_csv("./数据集/data_50.csv", header=None))
+        self.data = np.array(pd.read_csv("./数据集/data.csv", header=None))
         #各点之间的距离
-        self.distance = np.array(pd.read_csv("./数据集/distance_50.csv", header=None))
+        self.distance = np.array(pd.read_csv("./数据集/distance.csv", header=None))
         #该点是否能充电
-        self.charge_roads = np.array(pd.read_csv("./数据集/roads_50.csv", header=None))
+        self.charge_roads = np.array(pd.read_csv("./数据集/roads.csv", header=None))
         #在该路径的速度
-        self.speed = np.array(pd.read_csv("./数据集/speed_50.csv", header=None))
+        self.speed = np.array(pd.read_csv("./数据集/speed.csv", header=None))
         #4-7列分别为初始电量，满电量，剩余时间，行驶耗能
-        self.EVs_50 = np.array(pd.read_csv("./数据集/EVs_50.csv", header=None))
+        self.EVs_50 = np.array(pd.read_csv("./数据集/EVs.csv", header=None))
         self.MPT = 100  # 充电功率
 
         #把EVs_50中的经纬度换成对应点
@@ -49,34 +49,44 @@ class MDP:
         self.state = [self.start, self.time, self.E, self.end, self.E_max]
         return self.state
 
-    def get_reword(self, state, next_state):
+    def get_reword(self, state, next_state, action_list):
         r = 0
         #到达终点
         if next_state[0] == self.end:
-            r += 20
+            r += 10
 
         # 到达终点且满电且不超时
         if next_state[0] == self.end and next_state[2] == self.E_max and next_state[1] < 0:
-            r += 50
+            r += 20
 
         #超时
         if next_state[1] < 0 :
+            r += -15
+
+        # 到达终点且未超时
+        if next_state[0] == self.end and next_state[1] >= 0:
+            r += 10
+
+        #未到终点
+        if next_state[0] != self.end :
             r += -10
 
-        #超时未到终点
-        if next_state[0] != self.end and next_state[1] < 0 :
-            r += -30
-
         #状态不变
-        if state == next_state:
+        if state[1] == next_state[1]:
             r += -10
 
         #满电量
         if next_state[2] == self.E_max:
             r += 10
 
+        #电量为0
+        if next_state[2] <= 0:
+            r += -10
         #电量变化
         r += next_state[2] - state[2]
+
+        # 走越多步数扣越多分
+        r += -len(action_list)
 
         return r
 

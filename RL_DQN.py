@@ -68,13 +68,13 @@ class Net(nn.Module):
     # 前传
     # 激活函数为ReLU
     def forward(self, x):  # [b,n_states]
-        x = torch.relu(self.fc1(x))
+        x = self.leaky_relu(self.fc1(x))
 
-        x = torch.relu(self.fh1(x))
-        x = torch.relu(self.fh2(x))
-        x = torch.relu(self.fh3(x))
-        x = torch.relu(self.fh4(x))
-        x = torch.relu(self.fh5(x))
+        x = self.leaky_relu(self.fh1(x))
+        x = self.leaky_relu(self.fh2(x))
+        x = self.leaky_relu(self.fh3(x))
+        x = self.leaky_relu(self.fh4(x))
+        x = self.leaky_relu(self.fh5(x))
 
         x = self.fc2(x)
 
@@ -105,9 +105,10 @@ class DQN:
 
         # 构建2个神经网络，相同的结构，不同的参数
         # 实例化训练网络  [b,4]-->[b,50]  输出动作对应的奖励
-        self.q_net = Net(self.n_states, self.n_hidden, self.n_actions)
+        self.q_net = Net(self.n_states, self.n_hidden, self.n_actions).to(self.device)
         # 实例化目标网络
-        self.target_q_net = Net(self.n_states, self.n_hidden, self.n_actions)
+        self.target_q_net = Net(self.n_states, self.n_hidden, self.n_actions).to(self.device)
+        self.target_q_net.load_state_dict(self.q_net.state_dict())
 
         #加载网络模型参数
         if self.Is_train :
@@ -119,7 +120,7 @@ class DQN:
     # （2）动作选择
     def take_action(self, state,action_list):
         # 维度扩充，给行增加一个维度，并转换为张量shape=[1,4]
-        state = torch.Tensor(state[np.newaxis, :])
+        state = torch.tensor(state[np.newaxis, :], dtype=torch.float).to(self.device)
         # 如果小于该值就取最大的值对应的索引
         if np.random.random() > self.epsilon:  # 0-1
             # 前向传播获取该状态对应的动作的reward
@@ -131,7 +132,7 @@ class DQN:
                 if action not in action_list:
                     break
                 else:
-                    actions_value.data[0,action] = -100
+                    actions_value.data[0,action] = -float('inf')
         # 如果小于该值就随机探索
         else:
             # 随机选择一个动作
@@ -141,15 +142,15 @@ class DQN:
     # （3）网络训练
     def update(self, transition_dict):  # 传入经验池中的batch个样本
         # 获取当前时刻的状态 array_shape=[b,4]
-        states = torch.tensor(transition_dict['states'], dtype=torch.float)
+        states = torch.tensor(transition_dict['states'], dtype=torch.float).to(self.device)
         # 获取当前时刻采取的动作 tuple_shape=[b]，维度扩充 [b,1]
-        actions = torch.tensor(transition_dict['actions']).view(-1, 1)
+        actions = torch.tensor(transition_dict['actions']).view(-1, 1).to(self.device)
         # 当前状态下采取动作后得到的奖励 tuple=[b]，维度扩充 [b,1]
-        rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float).view(-1, 1)
+        rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float).view(-1, 1).to(self.device)
         # 下一时刻的状态 array_shape=[b,4]
-        next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float)
+        next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float).to(self.device)
         # 是否到达目标 tuple_shape=[b]，维度变换[b,1]
-        dones = torch.tensor(transition_dict['dones'], dtype=torch.float).view(-1, 1)
+        dones = torch.tensor(transition_dict['dones'], dtype=torch.float).view(-1, 1).to(self.device)
 
         # 输入当前状态，得到采取各运动得到的奖励 [b,4]==>[b,2]==>[b,1]
         # 根据actions索引在训练网络的输出的第1维度上获取对应索引的q值（state_value）

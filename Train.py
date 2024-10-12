@@ -16,7 +16,7 @@ device = torch.device("cuda"if torch.cuda.is_available() else "cpu")
 important_capacity = 250 #重要经验池
 capacity = 750  # 经验池容量
 lr = 1e-3  # 学习率
-gamma = 0.9  # 折扣因子
+gamma = 0.95  # 折扣因子
 epsilon = 0.9 # 贪心系数 小于探索
 epsilon_min = 0.01 #最小贪心系数
 epsilon_decay = 0.98 #贪心系数折扣率
@@ -29,7 +29,7 @@ return_list = []  # 记录每个回合的回报
 loss = [] # 记录每回合每次更新网络产生是loss
 loss_list = [] #用来保留每回合平均loss
 Is_train = False  #是否有训练模型
-episode = 200
+episode = 500
 
 
 # 加载环境
@@ -66,15 +66,15 @@ for i in range(episode):
             state = env.reset()  # len=4
             # 记录每个回合的回报
             episode_return = 0
-
+            action_list = [state[0]]
             done = False
 
             while True:
                 # 获取当前状态下需要采取的动作
                 action = agent.take_action(state,[])
-
+                action_list.append(action)
                 # 更新环境
-                next_state, reward, done = env.step(action)
+                next_state, reward, done = env.step(action,action_list)
                 # 添加经验池
                 if reward <= 10:
                     replay_buffer.add(state, action, reward, next_state, done)
@@ -137,6 +137,8 @@ reward_mean = np.mean(reward_return,axis=0)
 
 # 配置中文字体
 plt.rcParams['font.sans-serif'] = ['SimHei']
+# 显示负号
+plt.rcParams['axes.unicode_minus'] = False
 
 plt.figure(2)
 plt.plot(episodes_list, reward_mean[1:])
