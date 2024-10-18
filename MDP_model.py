@@ -37,7 +37,8 @@ class MDP:
         self.end =None  #终点
         self.start = None #起点
         self.state = [] #状态列表
-
+        #记录已获取的满电奖励次数
+        self.E_max_num = 0
     #根据电动车类型设置初始状态和目标
     def set_state_and_target(self,i):
         self.E_max = self.EVs[i][3]
@@ -47,46 +48,35 @@ class MDP:
         self.end = self.EVs[i][1]
         self.start = int(self.EVs[i][0])
         self.state = [self.start, self.time, self.E, self.end, self.E_max]
+        # 初始化满电奖励次数
+        self.E_max_num = 0
         return self.state
 
-    def get_reword(self, state, next_state, action_list):
+    def get_reword(self, state, next_state, action_list, done):
         r = 0
-        #到达终点
-        if next_state[0] == self.end:
-            r += 10
-
-        # 到达终点且满电且不超时
-        if next_state[0] == self.end and next_state[2] == self.E_max and next_state[1] < 0:
-            r += 20
-
-        #超时
-        if next_state[1] < 0 :
-            r += -15
-
         # 到达终点且未超时
-        if next_state[0] == self.end and next_state[1] >= 0:
-            r += 10
+        if next_state[0] == self.end and next_state[1] >= 0 and done:
+            r += 1
+            r += next_state[2] / self.E_max
 
-        #未到终点
-        if next_state[0] != self.end :
-            r += -10
+        # 未到终点 或 电量为0 或 时间为0
+        if (next_state[0] != self.end or next_state[1] < 0 or next_state[2] <= 0) and done:
+            r += -1
 
         #状态不变
         if state[1] == next_state[1]:
-            r += -10
+            r += -1.1
 
-        #满电量
-        if next_state[2] == self.E_max:
-            r += 10
+        #满电量获取次数不超过2次
+        # if next_state[2] == self.E_max and state[1] != next_state[1] and self.E_max_num < 2:
+        #     r += 0.9
+        #     self.E_max_num += 1
 
-        #电量为0
-        if next_state[2] <= 0:
-            r += -10
         #电量变化
-        r += next_state[2] - state[2]
-
-        # 走越多步数扣越多分
-        r += -len(action_list)
+        if next_state[2] - state[2] > 0:
+            r += (next_state[2] - state[2]) / self.E_max
+        else:
+            r += (next_state[2] - state[2]) / (self.cost*100)
 
         return r
 

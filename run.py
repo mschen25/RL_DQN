@@ -1,5 +1,4 @@
 import pandas as pd
-import openpyxl
 from Environment import Environment
 from RL_DQN import DQN
 import torch
@@ -8,24 +7,16 @@ import numpy as np
 import time
 from MDP_model import MDP
 
-# GPU运算
-device = torch.device("cuda"if torch.cuda.is_available() else "cpu")
+# cpu运算
+device = torch.device("cpu")
 
-capacity = 500  # 经验池容量
-lr = 1e-3  # 学习率
-gamma = 0.98  # 折扣因子
-epsilon = 0  # 贪心系数
-epsilon_min = 0.1 #最小贪心系数
-epsilon_decay = 0.98 #贪心系数折扣率
-target_update = 50  # 目标网络的参数的更新频率
-batch_size = 32
-min_size = 200  # 经验池超过多少后再训练
-episode = 1000
+
 
 n_hidden = 64  # 隐含层神经元个数
 n_states = 5  # 状态个数
-n_actions = 50 #动作个数
+n_actions = 100 #动作个数
 Is_train = True #是否有模型
+
 result_list = [] #汇总结果记录
 df = []
 #加载环境
@@ -41,10 +32,7 @@ start_time = time.time()
 agent = DQN(n_states=n_states,
             n_hidden=n_hidden,
             n_actions=n_actions,
-            learning_rate=lr,
-            gamma=gamma,
-            epsilon=epsilon,
-            target_update=target_update,
+
             device=device,
             Is_train=Is_train
             )
@@ -75,16 +63,16 @@ with tqdm(total=num) as pbar:
                 # 更新当前状态
                 state = next_state
             else:
-                path.append( (int(state[0]),int(state[3])))
+                path.append( (int(state[0]),int(next_state[0])))
                 break
 
         # 对到达终点的车进行记录
-        if E_and_T_list[-1][1] >= 0 and E_and_T_list[-1][0] > 0 :
-            df.append(EVs)
-            df.append(path)
-            df.append(E_and_T_list)
+        # if E_and_T_list[-1][1] >= 0 and E_and_T_list[-1][0] > 0 :
+        df.append(EVs)
+        df.append(path)
+        df.append(E_and_T_list)
 
-            result_list.append([i]+E_and_T_list[-1])
+        result_list.append([i]+E_and_T_list[-1])
 
         pbar.update(1)
 

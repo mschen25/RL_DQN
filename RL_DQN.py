@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-import torch.nn.functional as F
+from torch.nn import functional as F
 import numpy as np
 import collections
 import random
@@ -42,7 +42,7 @@ class ReplayBuffer:
 
     # 目前队列长度
     def size(self):
-        return len(self.buffer) + len(self.important_buffer)
+        return len(self.buffer)
 
 
 # -------------------------------------- #
@@ -103,6 +103,11 @@ class DQN:
         self.count = 0
         self.Is_train = Is_train
 
+        # 状态最大张量
+        self.state_max = torch.tensor([100, 5, 100, 100, 100]).to(self.device)
+        # 状态最小张量
+        self.state_min = torch.tensor([0, 0, 0, 0, 40]).to(self.device)
+
         # 构建2个神经网络，相同的结构，不同的参数
         # 实例化训练网络  [b,4]-->[b,50]  输出动作对应的奖励
         self.q_net = Net(self.n_states, self.n_hidden, self.n_actions).to(self.device)
@@ -112,19 +117,23 @@ class DQN:
 
         #加载网络模型参数
         if self.Is_train :
-            self.q_net.load_state_dict(torch.load("net.pth",weights_only=True))
-            self.target_q_net.load_state_dict(torch.load("net.pth",weights_only=True))
+            self.q_net.load_state_dict(torch.load("q_net.pth", weights_only=True))
+            self.target_q_net.load_state_dict(torch.load("q_net.pth", weights_only=True))
         # 优化器，更新训练网络的参数
-        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=self.learning_rate, weight_decay=1e-2)
+
+    # 状态最大最小归一化
+    def min_max_normalize(self, state):
+        return (state - self.state_min) / (self.state_max - self.state_min)
 
     # （2）动作选择
     def take_action(self, state,action_list):
         # 维度扩充，给行增加一个维度，并转换为张量shape=[1,4]
         state = torch.tensor(state[np.newaxis, :], dtype=torch.float).to(self.device)
-        # 如果小于该值就取最大的值对应的索引
-        if np.random.random() > self.epsilon:  # 0-1
+        # 如果大于该值就取最大的值对应的索引
+        if np.random.random() >= self.epsilon:  # 0-1
             # 前向传播获取该状态对应的动作的reward
-            actions_value = self.q_net(state)
+            actions_value = self.q_net(self.min_max_normalize(state))
             # 根据动作列表和Q值 选取未进行过的动作
             while True:
                 # 获取reward最大值对应的动作索引
@@ -135,34 +144,39 @@ class DQN:
                     actions_value.data[0,action] = -float('inf')
         # 如果小于该值就随机探索
         else:
-            # 随机选择一个动作
-            action = np.random.randint(self.n_actions)
+            while True:
+                # 随机选择一个动作
+                action = np.random.randint(self.n_actions)
+                if action not in action_list:
+                    break
+
         return action
 
     # （3）网络训练
     def update(self, transition_dict):  # 传入经验池中的batch个样本
-        # 获取当前时刻的状态 array_shape=[b,4]
+        # 获取当前时刻的状态 array_shape=[b,5]
         states = torch.tensor(transition_dict['states'], dtype=torch.float).to(self.device)
         # 获取当前时刻采取的动作 tuple_shape=[b]，维度扩充 [b,1]
         actions = torch.tensor(transition_dict['actions']).view(-1, 1).to(self.device)
         # 当前状态下采取动作后得到的奖励 tuple=[b]，维度扩充 [b,1]
         rewards = torch.tensor(transition_dict['rewards'], dtype=torch.float).view(-1, 1).to(self.device)
-        # 下一时刻的状态 array_shape=[b,4]
+        # 下一时刻的状态 array_shape=[b,5]
         next_states = torch.tensor(transition_dict['next_states'], dtype=torch.float).to(self.device)
         # 是否到达目标 tuple_shape=[b]，维度变换[b,1]
         dones = torch.tensor(transition_dict['dones'], dtype=torch.float).view(-1, 1).to(self.device)
 
-        # 输入当前状态，得到采取各运动得到的奖励 [b,4]==>[b,2]==>[b,1]
+        # 输入当前状态，得到采取各运动得到的奖励 [b,5]==>[b,50]==>[b,1]
         # 根据actions索引在训练网络的输出的第1维度上获取对应索引的q值（state_value）
-        q_values = self.q_net(states).gather(1, actions)  # [b,1]
-        # 下一时刻的状态[b,4]-->目标网络输出下一时刻对应的动作q值[b,2]-->
+        q_values = self.q_net(self.min_max_normalize(states)).gather(1, actions)  # [b,1]
+
+        # 下一时刻的状态[b,5]-->目标网络输出下一时刻对应的动作q值[b,50]-->
         # 选出下个状态采取的动作中最大的q值[b]-->维度调整[b,1]
-        max_next_q_values = self.target_q_net(next_states).max(1)[0].view(-1, 1)
+        max_next_q_values = self.target_q_net(self.min_max_normalize(next_states)).max(1)[0].view(-1, 1)
         # 目标网络输出的当前状态的q(state_value)：即时奖励+折扣因子*下个时刻的最大回报
         q_targets = rewards + self.gamma * max_next_q_values * (1 - dones)
 
         # 目标网络和训练网络之间的均方误差损失
-        dqn_loss = torch.mean(F.mse_loss(q_values, q_targets))
+        dqn_loss = F.mse_loss(q_values, q_targets)
         # PyTorch中默认梯度会累积,这里需要显式将梯度置为0
         self.optimizer.zero_grad()
         # 反向传播参数更新
@@ -170,18 +184,43 @@ class DQN:
         # 对训练网络更新
         self.optimizer.step()
 
+        self.count += 1
+
         # 在一段时间后更新目标网络的参数
         if self.count % self.target_update == 0:
             # 将目标网络的参数替换成训练网络的参数
             self.target_q_net.load_state_dict(
                 self.q_net.state_dict())
 
-        self.count += 1
-
         return dqn_loss.item()
+
+
+
     # (4)模型保存
-    def model_save(self):
-        torch.save(self.q_net.state_dict(),'net.pth')
+    def model_save(self,num):
+        torch.save(self.q_net.state_dict(),'q_net%d.pth' %num)
+        torch.save(self.target_q_net.state_dict(),'target_net%d.pth' %num)
 
     def update_epsilon(self,epsilon):
         self.epsilon = epsilon
+
+    # 通过综合两个网络来选取动作
+    def take_action_with_two_net(self, state, action_list):
+        state = torch.tensor(state[np.newaxis, :], dtype=torch.float).to(self.device)
+        actions_value_q_net = self.q_net(self.min_max_normalize(state))
+        actions_value_target_net = self.target_q_net(self.min_max_normalize(state))
+        while True:
+            a = actions_value_q_net.max()
+            b= actions_value_target_net.max()
+            if a > b:
+                action = actions_value_q_net.argmax().item()
+                if action in action_list:
+                    actions_value_q_net.data[0, action] = -float('inf')
+                else:
+                    return action
+            else:
+                action = actions_value_target_net.argmax().item()
+                if action in action_list:
+                    actions_value_target_net.data[0, action] = -float('inf')
+                else:
+                    return action

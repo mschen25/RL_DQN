@@ -30,14 +30,14 @@ class Environment:
     def step(self,action, action_list = []):
         # 更新当前状态和下一状态
         state, self.next_state=self.mdp.state_transfer(action)
-        # 更新奖励
-        self.reward = self.mdp.get_reword(state,self.next_state, action_list)
 
         # 更新运行状态done
         if self.next_state[1] < 0 or self.next_state[0] == self.end or self.next_state[2] <=0:
             self.done=True
         else:
             self.done=False
+        # 更新奖励
+        self.reward = self.mdp.get_reword(state,self.next_state, action_list, self.done)
 
         return np.array(self.next_state), self.reward, self.done
 
